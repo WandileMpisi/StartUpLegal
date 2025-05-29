@@ -1,0 +1,71 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+
+    --primary: 270 56.9% 51.4%; /* #6B46C1 */
+    --primary-light: 269 54.2% 63.5%; /* #805AD5 */
+    --primary-dark: 269 82.8% 34.9%; /* #4C1D95 */
+
+    --secondary: 270 50% 90%;
+    --secondary-foreground: 270 56.9% 51.4%;
+
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+
+    --accent: 270 50% 96%;
+    --accent-foreground: 270 56.9% 51.4%;
+
+    --success: 142.1 76.2% 36.3%;
+    --warning: 38 92% 50%;
+    --error: 0 84.2% 60.2%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+
+    --ring: 270 56.9% 51.4%;
+  }
+
+  body {
+    @apply font-sans bg-background text-foreground antialiased;
+  }
+}
+
+@layer components {
+  .button-primary {
+    @apply inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-dark focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 transition-colors;
+  }
+
+  .button-outline {
+    @apply inline-flex items-center justify-center rounded-md border border-primary bg-transparent px-4 py-2 text-sm font-medium text-primary hover:bg-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 transition-colors;
+  }
+
+  .gradient-bg {
+    @apply bg-gradient-to-br from-primary to-primary-light;
+  }
+
+  .card {
+    @apply rounded-lg bg-card p-6 shadow-md hover:shadow-lg transition-shadow;
+  }
+
+  .input-field {
+    @apply flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2;
+  }
+
+  .label {
+    @apply text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70;
+  }
+
+  .icon-container {
+    @apply flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-primary;
+  }
+}
