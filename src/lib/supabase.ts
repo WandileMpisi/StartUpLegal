@@ -1,20 +1,27 @@
 import { createClient } from '@supabase/supabase-js';
 import { Database } from './database.types';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+// Fallback values for development
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://placeholder.supabase.co';
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'placeholder-key';
 
-if (!supabaseUrl || !supabaseAnonKey) {
+// Only throw error if both are missing in production
+if ((!supabaseUrl || !supabaseAnonKey) && import.meta.env.PROD) {
   throw new Error('Missing Supabase environment variables');
 }
 
-export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    autoRefreshToken: true,
-    persistSession: true,
-    detectSessionInUrl: true
-  }
-});
+// For development, we'll use a mock mode if env vars are missing
+const isSupabaseConfigured = supabaseUrl !== 'https://placeholder.supabase.co' && supabaseAnonKey !== 'placeholder-key';
+
+export const supabase = isSupabaseConfigured 
+  ? createClient<Database>(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        autoRefreshToken: true,
+        persistSession: true,
+        detectSessionInUrl: true
+      }
+    })
+  : null; // Will be handled by fallback logic
 
 // Helper function to handle Supabase errors
 export const handleSupabaseError = (error: any) => {
@@ -29,6 +36,10 @@ export const handleSupabaseError = (error: any) => {
 
 // Helper function to get current user profile
 export const getCurrentUserProfile = async () => {
+  if (!supabase) {
+    throw new Error('Supabase not configured');
+  }
+
   const { data: { user } } = await supabase.auth.getUser();
   
   if (!user) {
@@ -47,3 +58,6 @@ export const getCurrentUserProfile = async () => {
 
   return profile;
 };
+
+// Check if Supabase is properly configured
+export const isSupabaseReady = () => isSupabaseConfigured;

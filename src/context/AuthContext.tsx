@@ -1,8 +1,9 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { supabase, handleSupabaseError } from '../lib/supabase';
+import { supabase, handleSupabaseError, isSupabaseReady } from '../lib/supabase';
 import { AuthState, User } from '../types';
+import { getFromStorage, saveToStorage, removeFromStorage, delay } from '../lib/utils';
 import type { Session } from '@supabase/supabase-js';
 
 interface AuthContextType extends AuthState {
@@ -22,35 +23,63 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   });
   const navigate = useNavigate();
 
-  // Initialize auth state and listen for auth changes
+  // Initialize auth state
   useEffect(() => {
-    // Get initial session
-    const initializeAuth = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
+    if (isSupabaseReady() && supabase) {
+      initializeSupabaseAuth();
+    } else {
+      // Fallback to localStorage for demo mode
+      initializeFallbackAuth();
+    }
+  }, []);
+
+  const initializeSupabaseAuth = async () => {
+    if (!supabase) return;
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      await handleAuthChange(session);
+
+      // Listen for auth changes
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
         await handleAuthChange(session);
-      } catch (error) {
-        console.error('Error initializing auth:', error);
+      });
+
+      return () => subscription.unsubscribe();
+    } catch (error) {
+      console.error('Error initializing Supabase auth:', error);
+      initializeFallbackAuth();
+    }
+  };
+
+  const initializeFallbackAuth = async () => {
+    try {
+      const storedUser = getFromStorage<User | null>('user', null);
+      if (storedUser) {
+        setState({
+          user: storedUser,
+          isAuthenticated: true,
+          isLoading: false,
+        });
+      } else {
         setState({
           user: null,
           isAuthenticated: false,
           isLoading: false,
         });
       }
-    };
-
-    initializeAuth();
-
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      await handleAuthChange(session);
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
+    } catch (error) {
+      console.error('Error initializing fallback auth:', error);
+      setState({
+        user: null,
+        isAuthenticated: false,
+        isLoading: false,
+      });
+    }
+  };
 
   const handleAuthChange = async (session: Session | null) => {
-    if (session?.user) {
+    if (session?.user && supabase) {
       try {
         // Get or create user profile
         let { data: profile, error } = await supabase
@@ -111,17 +140,45 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       setState((prev) => ({ ...prev, isLoading: true }));
       
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+      if (isSupabaseReady() && supabase) {
+        const { error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
 
-      if (error) {
-        throw error;
+        if (error) {
+          throw error;
+        }
+
+        toast.success('Logged in successfully');
+        navigate('/dashboard');
+      } else {
+        // Fallback demo login
+        await delay(1000);
+        
+        if (email === 'demo@example.com' && password === 'password') {
+          const user: User = {
+            id: '1',
+            fullName: 'Demo User',
+            email: email,
+            company: 'Demo Company',
+          };
+          
+          saveToStorage('user', user);
+          
+          setState({
+            user,
+            isAuthenticated: true,
+            isLoading: false,
+          });
+          
+          toast.success('Logged in successfully (Demo Mode)');
+          navigate('/dashboard');
+        } else {
+          toast.error('Invalid credentials');
+          setState((prev) => ({ ...prev, isLoading: false }));
+        }
       }
-
-      toast.success('Logged in successfully');
-      navigate('/dashboard');
     } catch (error: any) {
       console.error('Login error:', error);
       toast.error(handleSupabaseError(error));
@@ -133,22 +190,44 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       setState((prev) => ({ ...prev, isLoading: true }));
       
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            full_name: fullName,
+      if (isSupabaseReady() && supabase) {
+        const { error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            data: {
+              full_name: fullName,
+            },
           },
-        },
-      });
+        });
 
-      if (error) {
-        throw error;
+        if (error) {
+          throw error;
+        }
+
+        toast.success('Account created successfully');
+        navigate('/onboarding/step1');
+      } else {
+        // Fallback demo signup
+        await delay(1000);
+        
+        const user: User = {
+          id: Date.now().toString(),
+          fullName,
+          email,
+        };
+        
+        saveToStorage('user', user);
+        
+        setState({
+          user,
+          isAuthenticated: true,
+          isLoading: false,
+        });
+        
+        toast.success('Account created successfully (Demo Mode)');
+        navigate('/onboarding/step1');
       }
-
-      toast.success('Account created successfully');
-      navigate('/onboarding/step1');
     } catch (error: any) {
       console.error('Signup error:', error);
       toast.error(handleSupabaseError(error));
@@ -158,10 +237,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = async () => {
     try {
-      const { error } = await supabase.auth.signOut();
-      
-      if (error) {
-        throw error;
+      if (isSupabaseReady() && supabase) {
+        const { error } = await supabase.auth.signOut();
+        
+        if (error) {
+          throw error;
+        }
+      } else {
+        // Fallback logout
+        removeFromStorage('user');
+        setState({
+          user: null,
+          isAuthenticated: false,
+          isLoading: false,
+        });
       }
 
       toast.success('Logged out successfully');
@@ -176,16 +265,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!state.user) return;
     
     try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({
-          full_name: userData.fullName,
-          company: userData.company,
-        })
-        .eq('id', state.user.id);
+      if (isSupabaseReady() && supabase) {
+        const { error } = await supabase
+          .from('profiles')
+          .update({
+            full_name: userData.fullName,
+            company: userData.company,
+          })
+          .eq('id', state.user.id);
 
-      if (error) {
-        throw error;
+        if (error) {
+          throw error;
+        }
+      } else {
+        // Fallback update
+        const updatedUser = { ...state.user, ...userData };
+        saveToStorage('user', updatedUser);
       }
 
       const updatedUser = { ...state.user, ...userData };
